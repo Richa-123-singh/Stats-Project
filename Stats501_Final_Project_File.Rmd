@@ -1,0 +1,1097 @@
+---
+title: "Final Project"
+author: "Richa Singh, Tejas Sivan, Namaratha JayaPrakash, Arushi Misra, Ankitha Suresh"
+output:
+  pdf_document:
+    fig_height: 3
+    fig_width: 5
+  html_document:
+    fig_height: 3
+    fig_width: 5
+  word_document:
+    fig_height: 3
+    fig_width: 5
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+# Don't delete this chunk if you are using the mosaic package
+# This loads the mosaic and dplyr packages
+require(mosaic)
+```
+#### INTRODUCTION :
+
+In this project, we delve into the analysis of the Adult dataset, a widely recognized dataset in machine learning and statistics, accessible from the UCI Machine Learning Repository. This dataset encapsulates crucial demographic information about adults, serving as the foundation for a binary classification task focused on predicting whether an individual earns more than $50,000 annually. Our primary research question revolves around unraveling the intricate factors that wield influence over individuals' income levels in this dataset. By exploring the relationships and interactions among various attributes, we aim to uncover key insights into the determinants of income, providing valuable perspectives for understanding societal dynamics and economic patterns. This investigation holds significant relevance in understading about the nuanced factors contributing to income disparities and, subsequently, aid in the formulation of targeted interventions for social and economic advancement.
+
+#### ABOUT THE DATASET:
+
+The Adult dataset, commonly referred to as the "Census Income" dataset, is a well-known dataset in the field of machine learning and statistics. It is hosted on the UCI Machine Learning Repository. The dataset contains demographic information about adults, and the task associated with it is typically binary classification, where the goal is to predict whether a person earns more than \$50,000 per year, based on various attributes.
+
+The attributes are - 
+
+1. `Age`: Continuous numerical variable representing the age of the individual.
+
+2. `Workclass`: Categorical variable indicating the type of employment (e.g., Private, Self-emp-not-inc, Self-emp-inc, Federal-gov, etc.).
+
+3. `fnlwgt`: Continuous numerical variable representing the final weight. This is a derived attribute used in the census sampling process.
+
+4. `Education`: Categorical variable indicating the highest level of education achieved by the individual (e.g., Bachelors, Some-college, 11th, HS-grad, etc.).
+
+5. `Education-Num`: Continuous numerical variable representing the education level as a numerical value.
+
+6. `Marital Status`: Categorical variable indicating the marital status of the individual (e.g., Married-civ-spouse, Divorced, Never-married, Separated, Widowed, etc.).
+
+7. `Occupation`: Categorical variable indicating the type of occupation of the individual (e.g., Tech-support, Craft-repair, Other-service, Sales, Exec-managerial, etc.).
+
+8. `Relationship`: Categorical variable indicating the relationship status of the individual in the family (e.g., Wife, Own-child, Husband, Not-in-family, Other-relative, Unmarried).
+
+9. `Race`: Categorical variable indicating the race of the individual (e.g., White, Asian-Pac-Islander, Amer-Indian-Eskimo, Other, Black).
+
+10. `Sex`: Categorical variable indicating the gender of the individual (Male or Female).
+
+11. `Capital Gain`: Continuous numerical variable representing capital gains for the individual.
+
+12. `Capital Loss`: Continuous numerical variable representing capital losses for the individual.
+
+13. `Hours per Week`: Continuous numerical variable representing the number of working hours per week.
+
+14. `Native Country`: Categorical variable indicating the native country of the individual (e.g., United-States, Cambodia, England, Puerto-Rico, etc.).
+
+15. `Income`: Categorical variable indicating whether the individual earns more than \$50,000 per year (\>50K) or not (\<=50K). This is often the target variable in analyses.
+
+
+
+For a comprehensive understanding of the dataset, we can consider making plots such as : 
+
+1. Histograms or density plots for continuous variables like `Age, Education-Num, Capital Gain, Capital Loss`, and `Hours per Week`. 
+
+2. Bar plots for categorical variables like `Workclass, Education, Marital Status, Occupation, Relationship, Race, Sex`, and `Native Country`. 
+
+3. Box plots to identify potential outliers and variations in continuous variables across different levels of categorical variables.
+
+
+
+#### RESEARCH QUESTION :
+
+What factors influence the income level of individuals in the Adult dataset, and how do these factors interact?
+
+#### LOADING THE DATA:
+
+```{r, include=FALSE}
+#Here we are loading the dataset and assigning valid column names.
+
+file_path <- "/Users/richasingh/Downloads/adult/adult.data"
+#file.exists(file_path)
+
+dat_raw <- read.table(file_path, header = FALSE, na.strings = " ?", sep = ",", stringsAsFactors = FALSE)
+colnames(dat_raw) <- c(
+  "age", "workclass", "fnlwgt", "education", "education.num",
+  "marital.status", "occupation", "relationship", "race", "sex",
+  "capital.gain", "capital.loss", "hours.per.week", "native.country", "income"
+)
+cat("number of rows: ", nrow(dat_raw), "\n")
+cat("number of columns: ", ncol(dat_raw))
+```
+
+```{r, include=FALSE}
+# Count missing values in each column
+missing_values <- colSums(is.na(dat_raw))
+# Print the number of missing values for each column
+for (column in names(missing_values[missing_values > 0])) {
+  cat("Column:", column, "\tMissing Values:", missing_values[column], "\n")
+}
+# Print total number of missing values
+cat("Total Missing Values:", sum(missing_values), "\n")
+rows_with_missing <- apply(dat_raw, 1, function(row) any(is.na(row)))
+
+# Print the total number of rows with greater than or equal to one missing value
+cat("Total Rows with >= 1 Missing Value:", sum(rows_with_missing), "\n")
+```
+
+From the above, we notice that there are missing values in 3 columns, and the number of distinct values in each of these columns is high. A logical solution to handle this would have been to substitute the missing values with class-wise mean. We would proceed with using mode imputation as a more logical choice in this dataset for the following reasons:
+
+1.  **Categorical Nature of Columns:**
+    -   The columns with missing values (`workclass`, `occupation`, `native.country`) are categorical in nature.
+2.  **Simplicity and Interpretability:**
+    -   Mode imputation is simple and straightforward, making it easy to implement and interpret.
+3.  **Handling Small Amounts of Missing Data:**
+    -   The number of missing values in these columns is relatively small, and mode imputation is effective when missingness is not extensive.
+4.  **Minimal Impact on Data Distribution:**
+    -   Mode imputation is less likely to distort the distribution of the categorical variables, especially when the missingness is random.
+
+Therefore, Mode imputation is a pragmatic choice for handling missing categorical values in this dataset due to its simplicity, suitability for small amounts of missing data, and minimal impact on the distribution of categorical variables.
+
+```{r , include=FALSE}
+#PERFORMING MODE IMPUTATION ON THE DATASET
+# Assuming your data frame is 'dat_raw' and the columns are 'workclass', 'occupation', 'native.country'
+
+# Function to calculate mode
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+# Columns with missing values
+columns_with_missing_values <- c("workclass", "occupation", "native.country")
+
+# Impute missing values with the mode for each column
+for (col in columns_with_missing_values) {
+  mode_value <- Mode(dat_raw[[col]])
+  dat_raw[[col]] <- ifelse(is.na(dat_raw[[col]]), mode_value, dat_raw[[col]])
+}
+
+# Check for remaining missing values
+remaining_missing_values <- colSums(is.na(dat_raw[, columns_with_missing_values]))
+print("Remaining Missing Values after Imputation:")
+print(remaining_missing_values)
+```
+
+```{r , include=FALSE}
+library(stringr) 
+library(dplyr)
+dat_raw<-dat_raw %>% mutate_if(is.character, str_trim)
+dat_raw$workclass<-as.factor(dat_raw$workclass)
+dat_raw$occupation<-as.factor(dat_raw$occupation)
+dat_raw$native.country<-as.factor(dat_raw$native.country)
+dat_raw$education<-as.factor(dat_raw$education)
+dat_raw$marital.status<-as.factor(dat_raw$marital.status)
+dat_raw$relationship<-as.factor(dat_raw$relationship)
+dat_raw$race<-as.factor(dat_raw$race)
+dat_raw$sex<-as.factor(dat_raw$sex)
+```
+
+```{r , include=FALSE}
+
+# Check for missing values in 'income'
+missing_values <- sum(is.na(dat_raw$income))
+
+# Check for infinite values in 'income'
+infinite_values <- sum(!is.finite(dat_raw$income))
+
+# Print the results
+cat("Total rows in 'income':", length(dat_raw$income), "\n")
+cat("Missing values in 'income':", missing_values, "\n")
+cat("Infinite values in 'income':", infinite_values, "\n")
+str(dat_raw$income)
+distinct_income_values <- unique(dat_raw$income)
+
+# Print the distinct values
+print(distinct_income_values)
+print(count(distinct_income_values))
+```
+
+```{r , include=FALSE}
+#DATA VISUALIZATION - 1
+library(ggplot2)
+
+# Histograms for continuous variables
+ggplot(dat_raw, aes(x = age)) +
+  geom_histogram(binwidth = 5, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Age", x = "Age", y = "Frequency") +
+  theme_minimal() +
+  facet_wrap(~income, scales = "free_y")
+
+ggplot(dat_raw, aes(x = education.num)) +
+  geom_histogram(binwidth = 1, fill = "salmon", color = "black") +
+  labs(title = "Distribution of Education-Num", x = "Education-Num", y = "Frequency") +
+  theme_minimal() +
+  facet_wrap(~income, scales = "free_y")
+
+ggplot(dat_raw, aes(x = capital.gain)) +
+  geom_histogram(binwidth = 5000, fill = "lightgreen", color = "black") +
+  labs(title = "Distribution of Capital Gain", x = "Capital Gain", y = "Frequency") +
+  theme_minimal() +
+  facet_wrap(~income, scales = "free_y")
+
+ggplot(dat_raw, aes(x = capital.loss)) +
+  geom_histogram(binwidth = 500, fill = "coral", color = "black") +
+  labs(title = "Distribution of Capital Loss", x = "Capital Loss", y = "Frequency") +
+  theme_minimal() +
+  facet_wrap(~income, scales = "free_y")
+
+ggplot(dat_raw, aes(x = hours.per.week)) +
+  geom_histogram(binwidth = 5, fill = "lightblue", color = "black") +
+  labs(title = "Distribution of Hours per Week", x = "Hours per Week", y = "Frequency") +
+  theme_minimal() +
+  facet_wrap(~income, scales = "free_y")
+
+# Bar plots for categorical variables
+ggplot(dat_raw, aes(x = workclass, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Workclass", x = "Workclass", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(dat_raw, aes(x = education, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Education", x = "Education", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(dat_raw, aes(x = marital.status, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Marital Status", x = "Marital Status", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(dat_raw, aes(x = occupation, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Occupation", x = "Occupation", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(dat_raw, aes(x = relationship, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Relationship", x = "Relationship", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(dat_raw, aes(x = race, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Race", x = "Race", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(dat_raw, aes(x = sex, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Sex", x = "Sex", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(dat_raw, aes(x = native.country, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Native Country", x = "Native Country", y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+#### BOX PLOTS TO CHECK OUTLIERS:
+
+```{r , include=FALSE}
+#DATA VISUALIZATION - 2
+library(ggplot2)
+
+# Box plots for continuous variables across different levels of categorical variables
+ggplot(dat_raw, aes(x = workclass, y = age, fill = income)) +
+  geom_boxplot() +
+  labs(title = "Box Plot of Age by Workclass and Income", x = "Workclass", y = "Age") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(dat_raw, aes(x = education, y = age, fill = income)) +
+  geom_boxplot() +
+  labs(title = "Box Plot of Age by Education and Income", x = "Education", y = "Age") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(dat_raw, aes(x = marital.status, y = age, fill = income)) +
+  geom_boxplot() +
+  labs(title = "Box Plot of Age by Marital Status and Income", x = "Marital Status", y = "Age") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(dat_raw, aes(x = occupation, y = age, fill = income)) +
+  geom_boxplot() +
+  labs(title = "Box Plot of Age by Occupation and Income", x = "Occupation", y = "Age") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(dat_raw, aes(x = relationship, y = age, fill = income)) +
+  geom_boxplot() +
+  labs(title = "Box Plot of Age by Relationship and Income", x = "Relationship", y = "Age") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(dat_raw, aes(x = race, y = age, fill = income)) +
+  geom_boxplot() +
+  labs(title = "Box Plot of Age by Race and Income", x = "Race", y = "Age") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(dat_raw, aes(x = sex, y = age, fill = income)) +
+  geom_boxplot() +
+  labs(title = "Box Plot of Age by Sex and Income", x = "Sex", y = "Age") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(dat_raw, aes(x = native.country, y = age, fill = income)) +
+  geom_boxplot() +
+  labs(title = "Box Plot of Age by Native Country and Income", x = "Native Country", y = "Age") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+We noticed some outliers in all the attributes from the above box plots.
+
+#### TEST 1 - LOGISTIC REGRESSION
+
+
+**Logistic Regression:**
+
+Logistic regression models the relationship between a binary dependent variable and one or more independent variables. The logistic function (sigmoid function) is used to transform a linear combination of the predictors into probabilities. The output is then interpreted as the log-odds of the event happening, allowing for a linear decision boundary in the input space.
+
+**Assumptions of Logistic Regression:** 
+
+1. Binary Dependent Variable: The dependent variable should be binary. In this case, `income` is converted to a binary variable ('\>50K'/'\<=50K').Hence, this condition is satisfied.
+
+2.  Independence of Observations: Observations should be independent of each other. The data has been collected independently of each other. Hence, this condition is satisfied.
+
+3.  Linearity of Independent Variables: The relationship between the independent variables and the log-odds of the dependent variable should be linear. - the continuous variables seem to be approximately linear.
+
+4.  Absence of Multicollinearity: Independent variables should not be highly correlated - This has been validated using the Cramer's V test below. We can see that none of the pairs of independent variables display high correlation. Hence, this condition is satisfied.
+
+5.  No Extreme Outliers: Outliers can strongly influence the results - There are some outliers present as seen from the plots above, so would have to cautiously interpret the results.
+
+6.Large Sample Size: Logistic regression performs better with a larger sample size. Our dataset contains more than 4000 rows of data. Hence, this condition satisfies.
+
+```{r , include = FALSE}
+#CHECKING FOR ABSENCE OF MULTICOLLINEARITY ASSUMPTION:
+# Install and load the necessary packages
+library(vcd)
+
+# Select the categorical variables
+categorical_vars <- c("age", "education", "marital.status", "relationship", "race", "sex", "native.country", "occupation")
+
+# Create a contingency table for each pair of variables
+contingency_tables <- lapply(categorical_vars, function(var1) {
+  lapply(categorical_vars, function(var2) {
+    table(dat_raw[[var1]], dat_raw[[var2]])
+  })
+})
+
+# Calculate Cramér's V for each pair of variables
+cramer_vs <- lapply(contingency_tables, function(table_list) {
+  lapply(table_list, function(table) {
+    assocstats(table)$cramer
+  })
+})
+
+# Print the results
+for (i in seq_along(categorical_vars)) {
+  for (j in seq_along(categorical_vars)) {
+    cat("Cramér's V between", categorical_vars[i], "and", categorical_vars[j], ":", cramer_vs[[i]][[j]], "\n")
+  }
+}
+```
+
+```{r , include=FALSE}
+#PERFORMING LOGISTIC REGRESSION - 
+dat_raw$income <- as.factor(dat_raw$income)
+
+# Define predictors, including capital gain and capital loss
+predictors <- c("age", "education", "marital.status", "relationship", "race", "sex", "native.country","occupation")
+
+# Perform logistic regression
+model <- glm(income ~ ., data = dat_raw[, c("income", predictors)], family = "binomial")
+
+# Print a summary of the model
+summary(model)
+
+```
+
+INTERPRETATION OF LOGISTIC REGRESSION TEST RESULTS:
+
+The logistic regression output provides coefficients for each predictor variable, indicating their impact on the log-odds of the response variable (income). Here's a simplified interpretation for some key variables:
+
+1.  **Age:** For each one-unit increase in age, the log-odds of having income \>50K increases by 0.0194. Age has a positive association with higher income.
+
+2.  **Education:**
+
+    -   Categories like "Bachelors," "Masters," and "Doctorate" have positive coefficients, indicating a positive association with higher income.
+    -   Categories like "11th," "1st-4th," and "5th-6th" have coefficients close to zero, suggesting a weaker association.
+
+3.  **Marital Status:**
+
+    -   Being "Married-AF-spouse" and "Married-civ-spouse" have positive coefficients, indicating a positive association with higher income.
+    -   "Never-married" has a negative coefficient, suggesting a negative association with higher income.
+
+4.  **Relationship:**
+
+    -   "Wife" has a strong positive coefficient, indicating a positive association with higher income.
+    -   "Own-child" has a strong negative coefficient, suggesting a negative association with higher income.
+
+5.  **Race:**
+
+    -   "White" has a positive coefficient, indicating a positive association with higher income.
+    -   "Black" and "Asian-Pac-Islander" have positive coefficients, but the significance may vary.
+
+6.  **Sex:**
+
+    -   Being "Male" has a positive coefficient, indicating a positive association with higher income.
+
+7.  **Native Country:**
+
+    -   Many categories have negative coefficients, suggesting a negative association with higher income compared to the reference category ("United-States").
+    -   Some specific countries like "India," "China," and "Iran" have notable negative coefficients.
+
+8.  **Occupation:**
+
+    -   "Exec-managerial," "Prof-specialty," "Tech-support," and "Protective-serv" have positive coefficients, indicating a positive association with higher income.
+    -   "Farming-fishing," "Handlers-cleaners," and "Other-service" have negative coefficients, suggesting a negative association.
+
+```{r , include=FALSE}
+dat_raw$income <- as.factor(dat_raw$income)
+
+# Define predictors, including capital gain and capital loss
+predictors <- c("workclass", "hours.per.week")
+
+# Perform logistic regression
+model <- glm(income ~ ., data = dat_raw[, c("income", predictors)], family = "binomial")
+
+# Print a summary of the model
+summary(model)
+```
+
+Interpretation:
+
+9. **Workclass:** "Private" has a negative coefficient (-0.841965), suggesting that compared to the reference category "Federal-gov," individuals working in the private sector are less likely to have income \>50K. "Self-emp-inc" has a positive coefficient (0.403964), indicating that individuals who are self-employed in incorporated businesses are more likely to have income \>50K. Other workclass categories also have coefficients indicating their impact compared to the reference category.
+
+10. **Hours per Week:** The coefficient for "hours.per.week" is 0.043717. This means that for each additional hour worked per week, the log-odds of having income \>50K increase by 0.043717.
+
+From the above tests, we could fairly conclude that higher age and higher hours per week contribute to higher income. Now, we would run some more tests.
+
+
+### TEST 2- PROPORTION TEST
+
+The proportion test is used to determine if the distribution of a particular categorical variable is the same among different groups defined by another categorical variable. The goal is to determine if there are significant differences in proportions between subgroups. In this analysis, proportions were examined for various demographic variables among individuals with incomes greater than \$50,000 or less than \$50,000.
+```{r ,  include=FALSE}
+#TEST 2 - PROPORTION TEST 
+# Create age groups
+dat_raw$age_group <- cut(dat_raw$age, breaks = seq(0, max(dat_raw$age) + 10, by = 10), include.lowest = TRUE)
+
+# Create hours per week groups
+dat_raw$hours_per_week_group <- cut(dat_raw$hours.per.week, breaks = c(0, 20, 40, 60, 80, 100, max(dat_raw$hours.per.week) + 10), include.lowest = TRUE)
+
+# Subset the data for incomes '>50K'
+income_over_50k <- subset(dat_raw, income == '>50K')
+
+# Proportion test for age groups
+contingency_table_age <- table(income_over_50k$age_group)
+proportions_age_over_50k <- prop.table(contingency_table_age)
+print("Proportions for Age:")
+print(proportions_age_over_50k)
+
+# Proportion test for hours per week groups
+contingency_table_hours <- table(income_over_50k$hours_per_week_group)
+proportions_hours_over_50k <- prop.table(contingency_table_hours)
+print("Proportions for Hours per Week:")
+print(proportions_hours_over_50k)
+
+# Proportion test for workclass
+contingency_table_workclass <- table(income_over_50k$workclass)
+proportions_workclass_over_50k <- prop.table(contingency_table_workclass)
+print("Proportions for Workclass:")
+print(proportions_workclass_over_50k)
+
+# Proportion test for sex
+contingency_table_sex <- table(income_over_50k$sex)
+proportions_sex_over_50k <- prop.table(contingency_table_sex)
+print("Proportions for Sex:")
+print(proportions_sex_over_50k)
+
+# Proportion test for education
+contingency_table_education <- table(income_over_50k$education)
+proportions_education_over_50k <- prop.table(contingency_table_education)
+print("Proportions for Education:")
+print(proportions_education_over_50k)
+
+# Proportion test for country
+contingency_table_country <- table(income_over_50k$native.country)
+proportions_country_over_50k <- prop.table(contingency_table_country)
+print("Proportions for country:")
+print(proportions_country_over_50k)
+
+# Proportion test for marital status
+contingency_table_marital_status <- table(income_over_50k$marital.status)
+proportions_maritalstatus_over_50k <- prop.table(contingency_table_marital_status)
+print("Proportions for marital_status:")
+print(proportions_maritalstatus_over_50k)
+
+# Proportion test for occupation
+contingency_table_occupation <- table(income_over_50k$occupation)
+proportions_occupation_over_50k <- prop.table(contingency_table_occupation)
+print("Proportions for occupation:")
+print(proportions_occupation_over_50k)
+
+# Proportion test for relationship
+contingency_table_relationship <- table(income_over_50k$relationship)
+proportions_relationship_over_50k <- prop.table(contingency_table_relationship)
+print("Proportions for relationship:")
+print(proportions_relationship_over_50k)
+
+# Proportion test for race
+contingency_table_race <- table(income_over_50k$race)
+proportions_race_over_50k <- prop.table(contingency_table_race)
+print("Proportions for race:")
+print(proportions_race_over_50k)
+
+```
+
+
+```{r , include= FALSE}
+# PLOTS FOR PROPORTION TESTS
+library(ggplot2)
+
+# Plot for Age
+ggplot(dat_raw, aes(x = age_group, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Age Group",
+       x = "Age Group",
+       y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal()
+
+# Plot for Hours per Week
+ggplot(dat_raw, aes(x = hours_per_week_group, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Hours per Week Group",
+       x = "Hours per Week Group",
+       y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal()
+
+# Plot for Workclass
+ggplot(dat_raw, aes(x = workclass, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Workclass",
+       x = "Workclass",
+       y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plot for Sex
+ggplot(dat_raw, aes(x = sex, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Sex",
+       x = "Sex",
+       y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal()
+
+# Plot for Education
+ggplot(dat_raw, aes(x = education, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Education",
+       x = "Education",
+       y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plot for Native Country
+ggplot(dat_raw, aes(x = native.country, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Native Country",
+       x = "Native Country",
+       y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plot for Marital Status
+ggplot(dat_raw, aes(x = marital.status, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Marital Status",
+       x = "Marital Status",
+       y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plot for Occupation
+ggplot(dat_raw, aes(x = occupation, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Occupation",
+       x = "Occupation",
+       y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plot for Relationship
+ggplot(dat_raw, aes(x = relationship, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Relationship",
+       x = "Relationship",
+       y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plot for Race
+ggplot(dat_raw, aes(x = race, fill = income)) +
+  geom_bar(position = "fill", stat = "count") +
+  labs(title = "Proportion of >50K Income by Race",
+       x = "Race",
+       y = "Proportion") +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+
+
+INTERPRETATION OF PROPORTION TEST RESULTS:
+
+1.  **Age:**
+    -   The proportions for each age group indicate the proportion of individuals in each group who have an income greater than 50K.
+    -   The age group (40, 50] has the highest proportion (0.3386), suggesting that individuals in this age range are more likely to have a higher income.
+2.  **Hours per Week:**
+    -   The proportions for each hours per week group show the distribution of individuals with income greater than 50K based on their weekly working hours.
+    -   The group (40, 60] has the highest proportion (0.4402), indicating that individuals working 40-60 hours per week are more likely to have a higher income.
+3.  **Workclass:**
+    -   The proportions for each workclass show the contribution of each workclass category to higher income.
+    -   Self-employed individuals in incorporated businesses ("Self-emp-inc") have the highest proportion (0.0793), suggesting that this category is more likely to have a higher income.
+4.  **Sex:**
+    -   The proportions for each gender show the distribution of higher income individuals by gender.
+    -   Males have a higher proportion (0.8496), indicating that a larger proportion of individuals with income greater than 50K are male.
+5.  **Education:**
+    -   The proportions for each education level indicate the contribution of each education category to higher income.
+    -   Individuals with a Bachelors (0.2833) or Masters (0.1223) degree have higher proportions, suggesting that higher education levels contribute to higher income.
+6.  **Country:**
+    -   The proportions for each country show the distribution of individuals with income greater than 50K based on their native country.
+    -   The United States has a significantly higher proportion (0.9332), indicating that a large majority of individuals with higher income are from the United States.
+7.  **Marital Status:**
+    -   The proportions for each marital status show the contribution of each category to higher income.
+    -   Married individuals (Married-civ-spouse) have the highest proportion (0.8535), suggesting that being married is associated with a higher income.
+8.  **Occupation:**
+    -   The proportions for each occupation category indicate the contribution of each occupation to higher income.
+    -   Exec-managerial has a relatively higher proportion (0.2510), suggesting that individuals in executive or managerial roles are more likely to have a higher income.
+9.  **Relationship:**
+    -   The proportions for each relationship category show the contribution of each category to higher income.
+    -   Husbands have the highest proportion (0.7548), suggesting that being a husband is associated with a higher income.
+10. **Race:**
+
+-   The proportions for each race category show the distribution of individuals with income greater than 50K based on their race.
+-   Whites have the highest proportion (0.9077), indicating that a large majority of individuals with higher income are White.
+
+
+#### TEST 3 - Chi-Square
+
+
+
+Since there is a significant number of categorical variables in this dataset, using the Chi-Square test is a good idea. The Chi-Square test is a statistical hypothesis test that is used to ascertain if there is a significant association between two categorical variables. It can be used for nominal and ordinal variables. The test assesses whether the observed frequency distribution of the variables differs from the expected distribution, assuming that there is no association between them. The hypotheses are: H0: There is no association between the variables. H1: There is an association between the variables.
+
+Assumptions: 
+
+1. Counted Data Condition: this condition holds as we have counts of the various categories of the categorical variables. 
+
+2. Independence: this condition is assumed to be held true. 
+
+3. Randomization: as we have random samples, this condition is assumed to be held true. 
+
+4. Expected cell Frequency Condition: we check that the value of each cell in the contingency table is greater than 5. This condition is not met by a handful of tests (e.g. workclass, native.country) so we must exercise caution while interpreting these results.
+
+
+Let us now explore the relationship between the categorical variables and `income`.
+
+First, let us start with a variable that is highly likely to influence `income` : `workclass`.
+
+```{r ,  include=FALSE}
+workclass_contingency_table <- table(dat_raw$workclass, dat_raw$income)
+print(workclass_contingency_table)
+workclass_chi_square_result <- chisq.test(workclass_contingency_table)
+print(workclass_chi_square_result)
+```
+
+Since the p-value is extremely small (and definitely smaller than the standard significance level of 0.05), we would have to reject the null hypothesis here: clearly `workclass` has a strong associative effect on `income`.
+
+(It is to be noted that 2.2e-16 here doesn't exactly represent a numerical value; instead, 2.2e-16 is the smallest value that can be represented here).
+
+We can observe the association with a side-by-side bar chart:
+
+```{r ,  include=FALSE}
+
+ggplot(dat_raw, aes(x = workclass, fill = income)) +
+  geom_bar(position = "dodge", stat = "count") +
+  labs(title = "Side-by-Side Bar Chart - Workplace",
+       x = "Workplace",
+       y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Now, performing a similar test on `occupation`:
+
+```{r ,  include=FALSE}
+occupation_contingency_table <- table(dat_raw$occupation, dat_raw$income)
+print(occupation_contingency_table)
+occupation_chi_square_result <- chisq.test(occupation_contingency_table)
+print(occupation_chi_square_result)
+
+
+ggplot(dat_raw, aes(x = occupation, fill = income)) +
+  geom_bar(position = "dodge", stat = "count") +
+  labs(title = "Side-by-Side Bar Chart - Occupation",
+       x = "Occupation",
+       y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Just like with `workclass`, `occupation` has a strong effect on `income` - in fact, the X-squared test statistic reveals an even stronger association.
+
+Similarly, we perform the chi-square test on the remaining categorical variables.
+
+Education:
+
+```{r ,  include=FALSE}
+education_contingency_table <- table(dat_raw$education, dat_raw$income)
+print(education_contingency_table)
+education_chi_square_result <- chisq.test(education_contingency_table)
+print(education_chi_square_result)
+
+ggplot(dat_raw, aes(x = education, fill = income)) +
+  geom_bar(position = "dodge", stat = "count") +
+  labs(title = "Side-by-Side Bar Chart - Education",
+       x = "Education",
+       y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+`Education` has an even higher X-squared value than `workclass` and `occupation`.
+
+Considering `Sex` and `Race`:
+
+```{r ,  include=FALSE}
+sex_contingency_table <- table(dat_raw$sex, dat_raw$income)
+print(sex_contingency_table)
+sex_chi_square_result <- chisq.test(sex_contingency_table)
+print(sex_chi_square_result)
+
+ggplot(dat_raw, aes(x = sex, fill = income)) +
+  geom_bar(position = "dodge", stat = "count") +
+  labs(title = "Side-by-Side Bar Chart - Sex",
+       x = "Sex",
+       y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r,  include=FALSE}
+race_contingency_table <- table(dat_raw$race, dat_raw$income)
+print(race_contingency_table)
+race_chi_square_result <- chisq.test(race_contingency_table)
+print(race_chi_square_result)
+
+ggplot(dat_raw, aes(x = race, fill = income)) +
+  geom_bar(position = "dodge", stat = "count") +
+  labs(title = "Side-by-Side Bar Chart - Race",
+       x = "Race",
+       y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+We can see that `Sex` has a much higher impact than `Race` (which still has a significant impact).
+
+Now, considering `relationship` and `marital.status`:
+
+```{r ,  include=FALSE}
+relationship_contingency_table <- table(dat_raw$relationship, dat_raw$income)
+print(relationship_contingency_table)
+relationship_chi_square_result <- chisq.test(relationship_contingency_table)
+print(relationship_chi_square_result)
+
+ggplot(dat_raw, aes(x = relationship, fill = income)) +
+  geom_bar(position = "dodge", stat = "count") +
+  labs(title = "Side-by-Side Bar Chart - Relationship",
+       x = "Relationship",
+       y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r ,  include=FALSE}
+marital.status_contingency_table <- table(dat_raw$marital.status, dat_raw$income)
+print(marital.status_contingency_table)
+marital.status_chi_square_result <- chisq.test(marital.status_contingency_table)
+print(marital.status_chi_square_result)
+
+ggplot(dat_raw, aes(x = marital.status, fill = income)) +
+  geom_bar(position = "dodge", stat = "count") +
+  labs(title = "Side-by-Side Bar Chart - Marital Status",
+       x = "Marital Status",
+       y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+We see very strong associations - `relationship` and `marital.status` have a large impact on `income`.
+
+Finally, `native.country`: (We do not include the side-by-side graph for `native.country` as there is a very large number of countries and the graph reveals no valuable insights).
+
+```{r ,  include=FALSE}
+native.country_contingency_table <- table(dat_raw$native.country, dat_raw$income)
+print(native.country_contingency_table)
+native.country_chi_square_result <- chisq.test(native.country_contingency_table)
+print(native.country_chi_square_result)
+
+
+```
+
+We can observe that ALL the categorical variables clearly affect the `income` variable (as they all fall under the standard significance level of 0.05). The X-squared value represents the magnitude of association between the variables; we can see that arranged from the most impactful to the least, we have: relationship, marital.status, education, occupation, sex, workclass, race, native.country.
+
+
+
+
+#### TEST 4 - ANOVA
+
+
+
+
+ANOVA (Analysis of Variance) is a statistical technique used to assess whether there are any statistically significant differences in the means of three or more groups. It does this by partitioning the total variance in the data into components attributable to different sources, allowing us to determine if the observed differences are likely due to true group effects rather than randomness.
+
+ANOVA assumes that the response variable (dependent variable) is continuous, normally distributed, and has equal variances across groups. If these assumptions are violated, ANOVA results may be unreliable. For non-continuous variables, other statistical tests like chi-squared tests for categorical variables or t-tests for two-group comparisons of continuous variables are more appropriate.
+
+The main assumptions for performing ANOVA (Analysis of Variance) are:
+
+1.  Homogeneity of Variances: The variances of the groups being compared should be approximately equal - We used Levene's test to check for this. For all continuous variables, the Levene's test suggests that the assumption of homogeneity of variances is violated, meaning that the variances are significantly different between groups for each variable. This violation should be taken into consideration when interpreting the results of subsequent analyses, and appropriate adjustments may be needed.
+
+2.  Normality of Residuals: The residuals (the differences between observed and predicted values) should be normally distributed. - As we can see from the Q-Q plots, this condition can be said to be approximately satisfied.
+
+3.  Independence of Observations: Observations within each group should be independent of each other - The data samples have been collected independently of each other. Hence, this condition satisfies.
+
+```{r,  include=FALSE}
+#CHECKING FOR HOMOGENEITY OF VARIANCES ASSUMPTION-
+# Assuming 'age', 'hours.per.week', 'education.num', 'capital.gain', 'capital.loss' are continuous variables
+continuous_vars <- c("age", "hours.per.week", "education.num", "capital.gain", "capital.loss")
+
+# Create an empty list to store Levene's test results
+levene_results <- list()
+
+# Loop through each continuous variable
+for (var in continuous_vars) {
+  # Perform Levene's test
+  levene_result <- car::leveneTest(dat_raw[, var], dat_raw$income)
+  
+  # Store the Levene's test result in the list
+  levene_results[[var]] <- levene_result
+}
+
+# Display Levene's test results
+for (var in continuous_vars) {
+  cat("Levene's Test for", var, "\n")
+  print(levene_results[[var]])
+  cat("\n")
+}
+
+```
+
+```{r , include = FALSE}
+#CHECKING FOR NORMALITY OF RESIDUALS ASSUMPTION USING QQ PLOTS-
+# Create an empty list to store ANOVA results
+anova_results <- list()
+
+# Loop through each continuous variable
+for (var in continuous_vars) {
+  # Create a formula for ANOVA
+  formula <- as.formula(paste(var, "~ income"))
+  
+  # Perform ANOVA
+  anova_result <- aov(formula, data = dat_raw)
+  
+  # Store the ANOVA result in the list
+  anova_results[[var]] <- anova_result
+}
+
+# Create an empty list to store Q-Q plots
+qq_plots <- list()
+
+# Loop through each ANOVA result
+for (var in continuous_vars) {
+  # Get residuals
+  residuals <- residuals(anova_results[[var]])
+  
+  # Create Q-Q plot
+  qq_plots[[var]] <- qqnorm(residuals, main = paste("Q-Q Plot for Residuals of", var))
+  qqline(residuals, col = 2)
+}
+
+# Display Q-Q plots
+for (var in continuous_vars) {
+  print(qq_plots[[var]])
+}
+
+```
+
+```{r, include = FALSE}
+#TEST 4 - PERFORMING ANOVA
+# Assuming 'age', 'hours.per.week', 'education.num', 'capital.gain', 'capital.loss' are continuous variables
+continuous_vars <- c("age", "hours.per.week", "education.num", "capital.gain", "capital.loss")
+
+# Create an empty list to store ANOVA results
+anova_results <- list()
+
+# Loop through each continuous variable
+for (var in continuous_vars) {
+  # Create a formula for ANOVA
+  formula <- as.formula(paste(var, "~ income"))
+  
+  # Perform ANOVA
+  anova_result <- aov(formula, data = dat_raw)
+  
+  # Store the ANOVA result in the list
+  anova_results[[var]] <- anova_result
+}
+
+# Display ANOVA results
+for (var in continuous_vars) {
+  cat("ANOVA for", var, "\n")
+  print(anova_results[[var]])
+  cat("\n")
+}
+
+```
+
+INTERPRETATION : 
+
+1.  **Age:**
+    -   The ANOVA result indicates that there is a significant difference in income based on age.
+    -   The Sum of Squares (SS) for income is 331826, suggesting variability in income explained by age.
+    -   The Residuals SS is 5726333, representing unexplained variability.
+    -   The residual standard error is 13.26, indicating the average amount by which the observed values deviate from the predicted values.
+2.  **Hours per Week:**
+    -   There is a significant difference in income based on hours per week.
+    -   The SS for income is 261890, indicating variability in income explained by hours per week.
+    -   The Residuals SS is 4702175, representing unexplained variability.
+    -   The residual standard error is 12.02, suggesting the average deviation of observed values from the predicted values.
+3.  **Education Number:**
+    -   There is a significant difference in income based on education number.
+    -   The SS for income is 24207.96, indicating variability in income explained by education number.
+    -   The Residuals SS is 191303.09, representing unexplained variability.
+    -   The residual standard error is 2.42, suggesting the average deviation of observed values from the predicted values.
+4.  **Capital Gain:**
+    -   There is a significant difference in income based on capital gain.
+    -   The SS for income is 8.857462e+10, indicating variability in income explained by capital gain.
+    -   The Residuals SS is 1.687330e+12, representing unexplained variability.
+    -   The residual standard error is 7198.87, suggesting the average deviation of observed values from the predicted values.
+5.  **Capital Loss:**
+    -   There is a significant difference in income based on capital loss.
+    -   The SS for income is 119793591, indicating variability in income explained by capital loss.
+    -   The Residuals SS is 5167199504, representing unexplained variability.
+    -   The residual standard error is 398.38, suggesting the average deviation of observed values from the predicted values.
+
+In summary, all of the attributes---age, hours per week, education number, capital gain, and capital loss---have a statistically significant impact on income, according to the ANOVA tests. The SS values for income indicate the amount of variability explained by each attribute. The residual standard error gives a measure of how well the model fits the data.
+
+#### TEST 5 - PAIRWISE COMPARISON USING TUKEY'S HSD TESTS -
+
+We can now do pairwise comparison for the attributes that displayed significant difference among groups.
+
+Pairwise comparison using Tukey's Honestly Significant Difference (HSD) tests is a technique usually employed after an ANOVA to identify specific group differences. 
+Tukey's HSD tests assess whether the mean difference between any two groups is statistically significant; this approach helps pinpoint which groups exhibit significant distinctions in means, providing a detailed understanding of the variations specific to a group.
+Here, we would work with age, hours.per.week attributes.
+
+The assumptions of Tukey's HSD Tests are -
+
+1. Homogeneity of Variances (Homoscedasticity): The variances within each group being compared should be approximately equal. Violations of this assumption can affect the accuracy of the test.
+
+2. Independent Observations: Observations within and between groups should be independent. This means that the value of one observation should not be dependent on or related to the value of another observation.
+
+3. Normally Distributed Residuals: The residuals (the differences between observed and expected values) should be normally distributed. While this assumption is not as critical as in ANOVA, deviations from normality can impact the reliability of the results.
+
+We checked if these conditions meet when performing ANOVA test. The same would apply here as well.
+
+
+```{r , include=FALSE}
+#TEST 5 - PAIRWISE COMPARISON AFTER ANOVA.
+# Assuming 'age' and 'hours.per.week' are continuous variables
+continuous_vars <- c("age", "hours.per.week")
+
+# Create an empty list to store ANOVA results
+anova_results <- list()
+
+# Create an empty list to store Tukey's HSD results
+tukey_results <- list()
+
+# Loop through each continuous variable
+for (var in continuous_vars) {
+  # Create a formula for ANOVA
+  formula <- as.formula(paste(var, "~ income"))
+  
+  # Perform ANOVA
+  anova_result <- aov(formula, data = dat_raw)
+  
+  # Store the ANOVA result in the list
+  anova_results[[var]] <- anova_result
+  
+  # Perform Tukey's HSD
+  tukey_result <- TukeyHSD(anova_result)
+  
+  # Store Tukey's HSD result in the list
+  tukey_results[[var]] <- tukey_result
+}
+
+# Display ANOVA results
+for (var in continuous_vars) {
+  cat("ANOVA for", var, "\n")
+  print(anova_results[[var]])
+  cat("\n")
+}
+
+# Display Tukey's HSD results
+for (var in continuous_vars) {
+  cat("Tukey's HSD for", var, "\n")
+  print(tukey_results[[var]])
+  cat("\n")
+}
+
+# Plot Tukey's HSD results
+for (var in continuous_vars) {
+  cat("Plot for Tukey's HSD on", var, "\n")
+  plot(tukey_results[[var]], las = 1)
+  cat("\n")
+}
+
+```
+
+INTEPRETATION OF PAIRWISE COMPARISON RESULTS:
+
+For both `age` and `hours.per.week`:
+
+1.  **Difference (`diff`):** The estimated difference in means between individuals with income greater than \$50K and those with income less than or equal to \$50K is given by the `diff` value.
+
+2.  **Confidence Interval (`lwr` and `upr`):** The confidence interval provides a range of values within which the true difference in means is likely to fall with 95% confidence. The `lwr` and `upr` values represent the lower and upper bounds of this interval.
+
+3.  **p-value (`p adj`):** The p-value is used to determine whether the observed differences are statistically significant. A p-value less than 0.05 (commonly used threshold) indicates that the difference in means is statistically significant.
+
+**Interpretation:**
+
+For Age:
+
+The estimated difference in mean age between individuals with income greater than \$50K and those with income less than or equal to \$50K is 7.47 years. This suggests that, on average, individuals with income greater than \$50K are older than those with income less than or equal to \$50K. The difference is statistically significant, meaning it is unlikely to have occurred by random chance. For Hours per Week:
+
+The estimated difference in mean hours worked per week between individuals with income greater than \$50K and those with income less than or equal to \$50K is 6.63 hours. This implies that, on average, individuals with income greater than \$50K work more hours per week than those with income less than or equal to \$50K. The difference is statistically significant, indicating it is unlikely to be a random variation.
+
+
+
+#### FINAL CONCLUSIONS -
+
+
+
+In conclusion, the Logistic Regression, Proportion tests, Chi-Square tests, ANOVA, and Pairwise comparison tests collectively reveal valuable insights into the factors influencing `income`. Categorical variables such as age, education, marital status, relationship, race, sex, native country, and occupation play crucial roles in determining whether an individual earns more than $50K. 
+
+1.  Higher age generally contributes to higher income. The age group (40, 50] has the highest proportion (0.3386) in income bracket of \>50K.
+2.  Higher work hours, typically 40-60 hours per week contribute to higher income.
+3.  Males form a higher proportion (0.8496) of the higher income bracket.
+4.  All of the attributes- age, hours per week, education number, capital gain, and capital loss---have a statistically significant  impact on income, according to the ANOVA tests
+5. Age and Hours per week have statistically significant association with income. The same has been confirmed by performing the Tukey's HSD test.
+6. From the Chi-Square tests, we conclude that ALL the categorical variables clearly affect the `income` variable in the order of relationship, marital.status, education, occupation, sex, workclass, race, native.country based on the X squared value.
+  
